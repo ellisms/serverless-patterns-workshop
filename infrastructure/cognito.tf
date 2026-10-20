@@ -18,7 +18,7 @@ data "aws_region" "current" {}
 # User pool.
 # --------------------------------------------------------------------- #
 resource "aws_cognito_user_pool" "pool" {
-  name = var.user_pool_name
+  name = local.user_pool_name
 
   # Use email as the sign-in alias/username.
   username_attributes      = ["email"]
@@ -71,7 +71,7 @@ resource "aws_cognito_user_pool" "pool" {
   }
 
   tags = {
-    Name        = var.user_pool_name
+    Name        = local.user_pool_name
     Environment = var.environment
     Project     = var.project
   }
@@ -86,7 +86,7 @@ resource "aws_cognito_user_pool" "pool" {
 # tokens the authorizer accepts.
 # --------------------------------------------------------------------- #
 resource "aws_cognito_user_pool_client" "client" {
-  name         = var.app_client_name
+  name         = local.app_client_name
   user_pool_id = aws_cognito_user_pool.pool.id
 
   # Public client (no secret) suitable for localhost / SPA development and

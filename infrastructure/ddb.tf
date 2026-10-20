@@ -6,7 +6,7 @@
 # the customer that owns an email. No prevent_destroy / deletion protection is
 # set, so the stack can be torn down with `terraform destroy`.
 resource "aws_dynamodb_table" "customers_table" {
-  name         = var.customers_table_name
+  name         = local.customers_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "customerId"
 
@@ -44,7 +44,7 @@ resource "aws_dynamodb_table" "customers_table" {
   }
 
   tags = {
-    Name        = var.customers_table_name
+    Name        = local.customers_table_name
     Environment = var.environment
     Project     = var.project
   }

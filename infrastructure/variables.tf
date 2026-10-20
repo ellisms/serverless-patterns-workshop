@@ -33,7 +33,7 @@ variable "project" {
 variable "customers_table_name" {
   description = "Name of the DynamoDB table that stores customer records."
   type        = string
-  default     = "customer-management_customers"
+  default     = null
 }
 
 # --------------------------------------------------------------------------- #
@@ -42,13 +42,13 @@ variable "customers_table_name" {
 variable "user_pool_name" {
   description = "Name of the Cognito user pool used to issue JWTs."
   type        = string
-  default     = "customer-management_UserPool"
+  default     = null
 }
 
 variable "app_client_name" {
   description = "Name of the Cognito user pool app client."
   type        = string
-  default     = "customer-management-client"
+  default     = null
 }
 
 variable "admin_group_name" {
