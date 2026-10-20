@@ -3,20 +3,16 @@
 
 # Two-stage CI/CD for the serverless Customer Management Platform.
 #
-# Stages:
-#   dev  - applies on every push and PR (any branch), stack base name workshop-dev
+#   dev  - applies on every push + PR (any branch), stack base name workshop-dev
 #   prod - applies only on push to main, gated by the protected GitHub
-#          Environment "prod" (required reviewer = manual approval),
-#          stack base name workshop-prod
+#          Environment "prod" (required reviewer), stack base name workshop-prod
 #
-# Auth: GitHub OIDC -> AWS IAM role (no stored keys). The role ARN comes from
-# repo variable AWS_DEPLOY_ROLE_ARN (created by infrastructure/bootstrap).
-#
-# State: local backend. terraform.tfstate is persisted BETWEEN runs as a
-# per-stage GitHub Actions artifact (downloaded at job start, uploaded at end).
-# NOTE: artifacts are not locking or durable - concurrent runs on the same
-# stage can race on state. A concurrency group per stage serializes runs to
-# reduce that risk. This is a workshop-grade pattern, not production-grade.
+# Auth: GitHub OIDC -> AWS IAM role (repo variable AWS_DEPLOY_ROLE_ARN).
+# State: local backend, persisted per stage as a GitHub Actions artifact
+#        (terraform-state-dev / terraform-state-prod). A per-stage concurrency
+#        group serializes runs so two runs never race the same state/stack.
+#        NOTE: workshop-grade; artifacts are not locking/durable. For anything
+#        beyond a workshop use an S3 backend + DynamoDB lock.
 
 name: cicd
 
@@ -25,7 +21,7 @@ on:
   pull_request:
 
 permissions:
-  id-token: write   # required for OIDC
+  id-token: write
   contents: read
 
 env:
@@ -33,15 +29,14 @@ env:
   TF_IN_AUTOMATION: "true"
 
 jobs:
-  # ----------------------------------------------------------------------- #
-  # DEV: all pushes and PRs, any branch. Applies for real.
-  # ----------------------------------------------------------------------- #
   dev:
     name: deploy-dev
     runs-on: ubuntu-latest
     environment: dev
+    # Serialize ALL dev runs globally so concurrent pushes never race the single
+    # shared dev state/stack (the cause of duplicated/orphaned resources).
     concurrency:
-      group: tfstate-dev
+      group: deploy-dev
       cancel-in-progress: false
     defaults:
       run:
@@ -83,31 +78,26 @@ jobs:
         run: terraform validate -no-color
 
       - name: Terraform apply (dev)
-        run: terraform apply -auto-approve -input=false -var="workshop_stack_base_name=workshop-dev"
+        run: terraform apply -auto-approve -input=false -state=terraform.tfstate -var="workshop_stack_base_name=workshop-dev"
 
       - name: Upload updated dev state
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state-dev
-          path: |
-            infrastructure/terraform.tfstate
-            infrastructure/terraform.tfstate.backup
+          path: infrastructure/terraform.tfstate
           retention-days: 90
           overwrite: true
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
-  # ----------------------------------------------------------------------- #
-  # PROD: only push to main, manual approval via protected environment "prod".
-  # ----------------------------------------------------------------------- #
   prod:
     name: deploy-prod
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: dev
-    environment: prod   # required reviewer in repo settings => manual approval gate
+    environment: prod
     concurrency:
-      group: tfstate-prod
+      group: deploy-prod
       cancel-in-progress: false
     defaults:
       run:
@@ -146,16 +136,14 @@ jobs:
         run: terraform validate -no-color
 
       - name: Terraform apply (prod)
-        run: terraform apply -auto-approve -input=false -var="workshop_stack_base_name=workshop-prod"
+        run: terraform apply -auto-approve -input=false -state=terraform.tfstate -var="workshop_stack_base_name=workshop-prod"
 
       - name: Upload updated prod state
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state-prod
-          path: |
-            infrastructure/terraform.tfstate
-            infrastructure/terraform.tfstate.backup
+          path: infrastructure/terraform.tfstate
           retention-days: 90
           overwrite: true
-          if-no-files-found: ignore
+          if-no-files-found: warn
