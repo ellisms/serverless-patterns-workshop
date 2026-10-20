@@ -1,0 +1,161 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+# Two-stage CI/CD for the serverless Customer Management Platform.
+#
+# Stages:
+#   dev  - applies on every push and PR (any branch), stack base name workshop-dev
+#   prod - applies only on push to main, gated by the protected GitHub
+#          Environment "prod" (required reviewer = manual approval),
+#          stack base name workshop-prod
+#
+# Auth: GitHub OIDC -> AWS IAM role (no stored keys). The role ARN comes from
+# repo variable AWS_DEPLOY_ROLE_ARN (created by infrastructure/bootstrap).
+#
+# State: local backend. terraform.tfstate is persisted BETWEEN runs as a
+# per-stage GitHub Actions artifact (downloaded at job start, uploaded at end).
+# NOTE: artifacts are not locking or durable - concurrent runs on the same
+# stage can race on state. A concurrency group per stage serializes runs to
+# reduce that risk. This is a workshop-grade pattern, not production-grade.
+
+name: cicd
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  # ----------------------------------------------------------------------- #
+  # DEV: all pushes and PRs, any branch. Applies for real.
+  # ----------------------------------------------------------------------- #
+  dev:
+    name: deploy-dev
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: tfstate-dev
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python 3.13 (Lambda packaging)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Download existing dev state (if any)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: terraform-state-dev
+          path: infrastructure
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform apply (dev)
+        run: terraform apply -auto-approve -input=false -var="workshop_stack_base_name=workshop-dev"
+
+      - name: Upload updated dev state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state-dev
+          path: |
+            infrastructure/terraform.tfstate
+            infrastructure/terraform.tfstate.backup
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: ignore
+
+  # ----------------------------------------------------------------------- #
+  # PROD: only push to main, manual approval via protected environment "prod".
+  # ----------------------------------------------------------------------- #
+  prod:
+    name: deploy-prod
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: dev
+    environment: prod   # required reviewer in repo settings => manual approval gate
+    concurrency:
+      group: tfstate-prod
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python 3.13 (Lambda packaging)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Download existing prod state (if any)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: terraform-state-prod
+          path: infrastructure
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform apply (prod)
+        run: terraform apply -auto-approve -input=false -var="workshop_stack_base_name=workshop-prod"
+
+      - name: Upload updated prod state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state-prod
+          path: |
+            infrastructure/terraform.tfstate
+            infrastructure/terraform.tfstate.backup
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: ignore
