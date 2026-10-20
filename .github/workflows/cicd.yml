@@ -104,7 +104,6 @@ jobs:
         run: terraform apply -auto-approve -input=false -state=terraform.tfstate -var="workshop_stack_base_name=workshop-dev"
 
       - name: Purge prior dev state artifacts
-        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_REPO: ${{ github.repository }}
@@ -119,7 +118,6 @@ jobs:
           done
 
       - name: Upload updated dev state
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state-dev
@@ -192,7 +190,6 @@ jobs:
         run: terraform apply -auto-approve -input=false -state=terraform.tfstate -var="workshop_stack_base_name=workshop-prod"
 
       - name: Purge prior prod state artifacts
-        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_REPO: ${{ github.repository }}
@@ -207,7 +204,6 @@ jobs:
           done
 
       - name: Upload updated prod state
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: terraform-state-prod
