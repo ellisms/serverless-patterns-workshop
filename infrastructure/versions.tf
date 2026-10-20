@@ -6,7 +6,15 @@
 #   - hashicorp/archive 2.8.1  (Lambda deployment packaging)
 #   - hashicorp/null    3.3.2  (build/local-exec packaging steps)
 terraform {
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.10.0"
+
+  # Remote state in S3. The bucket and per-stage key are supplied at init via
+  # -backend-config (see the CI workflow), so dev and prod use distinct state
+  # keys in the same bucket. use_lockfile uses S3-native locking (no DynamoDB).
+  backend "s3" {
+    encrypt      = true
+    use_lockfile = true
+  }
 
   required_providers {
     aws = {
