@@ -1,0 +1,4 @@
+# Runtime dependencies for the authorizer Lambda.
+# Pinned for reproducible builds; bundled into the deployment package at
+# `terraform apply` time via pip --platform manylinux2014_x86_64.
+PyJWT[crypto]==2.8.0

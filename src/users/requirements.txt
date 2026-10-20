@@ -1,0 +1,9 @@
+# Runtime dependencies for the users Lambda.
+#
+# boto3 and botocore are already provided by the AWS Lambda Python runtime,
+# so they are intentionally NOT pinned/bundled here to keep the deployment
+# package small. The handler relies only on the Python standard library plus
+# the runtime-provided boto3. Add third-party packages below as the service
+# grows.
+#
+# For local development and testing, install boto3 via requirements-dev.txt.

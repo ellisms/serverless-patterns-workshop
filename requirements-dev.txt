@@ -1,0 +1,6 @@
+# Testing / development dependencies for the Customer Management Platform.
+# Install with: python3.13 -m pip install -r requirements-dev.txt
+pytest==8.3.4
+hypothesis==6.122.3
+moto[dynamodb]==5.0.28
+boto3==1.35.90
