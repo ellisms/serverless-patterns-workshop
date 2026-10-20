@@ -49,10 +49,19 @@ data "aws_iam_policy_document" "assume_role" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Match BOTH the classic subject format and the new immutable-ID format
+    # GitHub issues for recently created repos
+    # (repo:<owner>@<ownerId>/<repo>@<repoId>:...). The repo uses the immutable
+    # format, so the classic pattern alone never matches and STS denies the
+    # assume. IDs are pinned (not wildcarded) so the trust survives a rename
+    # without widening to any repo.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_owner}/${var.github_repo}:*"]
+      values = [
+        "repo:${var.github_owner}/${var.github_repo}:*",
+        "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}:*",
+      ]
     }
   }
 }

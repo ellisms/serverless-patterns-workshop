@@ -19,6 +19,18 @@ variable "role_name" {
   default     = "workshop-github-actions-deploy"
 }
 
+variable "github_owner_id" {
+  description = "Numeric GitHub org/owner id (gh api /users/<owner> --jq .id). Used for the immutable-ID OIDC subject format."
+  type        = string
+  default     = "114107920"
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository id (gh api /repos/<owner>/<repo> --jq .id). Used for the immutable-ID OIDC subject format."
+  type        = string
+  default     = "1427123671"
+}
+
 variable "create_oidc_provider" {
   description = "Create the GitHub Actions OIDC provider. Set false if one already exists in the account."
   type        = bool
